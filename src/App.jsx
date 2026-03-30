@@ -203,9 +203,15 @@ const TimerApp = () => {
           return 8;
         }
 
-        if (currentPhase === 'work' && iteration < 18) {
+        if (currentPhase === 'work' && iteration < 17) {
           playBeep();
           setCurrentIteration((old) => old + 1);
+          return 8;
+        }
+
+        if (currentPhase === 'work' && iteration === 17) {
+          playBeep();
+          setCurrentIteration(18);
           return 8;
         }
 
@@ -223,9 +229,15 @@ const TimerApp = () => {
           return 8;
         }
 
-        if (currentPhase === 'finalWork' && iteration < 3) {
+        if (currentPhase === 'finalWork' && iteration < 2) {
           playBeep();
           setCurrentIteration((old) => old + 1);
+          return 8;
+        }
+
+        if (currentPhase === 'finalWork' && iteration === 2) {
+          playBeep();
+          setCurrentIteration(3);
           return 8;
         }
 
