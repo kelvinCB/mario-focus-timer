@@ -1,82 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Sparkles,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Play, Pause, RotateCcw, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import './App.css';
-
-const PREPARATION_SECONDS = 40;
-const WORK_SECONDS = 40;
-const BREAK_SECONDS = 20;
-const TOTAL_ITERATIONS = 3;
-
-const PHASES = {
-  preparation: 'preparation',
-  work: 'work',
-  break: 'break',
-  finalWork: 'finalWork',
-  completed: 'completed',
-};
-
-const phaseConfig = {
-  [PHASES.preparation]: {
-    label: 'Preparación',
-    subtitle: 'Respira, enfócate y prepárate para arrancar.',
-    duration: PREPARATION_SECONDS,
-    color: '#60a5fa',
-  },
-  [PHASES.work]: {
-    label: 'Trabajo',
-    subtitle: 'Modo estrella activado. Dale con todo.',
-    duration: WORK_SECONDS,
-    color: '#f59e0b',
-  },
-  [PHASES.break]: {
-    label: 'Break',
-    subtitle: 'Micro descanso. Sacude los hombros y vuelve.',
-    duration: BREAK_SECONDS,
-    color: '#34d399',
-  },
-  [PHASES.finalWork]: {
-    label: 'Trabajo final',
-    subtitle: 'Último empuje. Cierra fuerte.',
-    duration: WORK_SECONDS,
-    color: '#f97316',
-  },
-  [PHASES.completed]: {
-    label: 'Completado',
-    subtitle: 'Misión cumplida. Quedó nítido.',
-    duration: 0,
-    color: '#a78bfa',
-  },
-};
-
-const formatTime = (seconds) => {
-  const mins = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const secs = (seconds % 60).toString().padStart(2, '0');
-  return `${mins}:${secs}`;
-};
 
 const TimerApp = () => {
   const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(PREPARATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(40);
   const [currentIteration, setCurrentIteration] = useState(1);
-  const [phase, setPhase] = useState(PHASES.preparation);
+  const [phase, setPhase] = useState('preparation');
   const [confetti, setConfetti] = useState([]);
   const [isMusicMuted, setIsMusicMuted] = useState(false);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const audioContextRef = useRef(null);
-  const musicTimeoutsRef = useRef([]);
-
-  const currentConfig = phaseConfig[phase];
-  const totalSeconds = currentConfig.duration || 1;
-  const progress = useMemo(() => (timeLeft / totalSeconds) * 100, [timeLeft, totalSeconds]);
 
   const initAudio = () => {
     if (!audioContextRef.current) {
@@ -89,293 +22,324 @@ const TimerApp = () => {
     if (audioContextRef.current?.state === 'suspended') {
       audioContextRef.current.resume();
     }
-
-    if (!audioUnlocked) {
-      setAudioUnlocked(true);
-    }
-  };
-
-  const clearScheduledMusic = () => {
-    musicTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    musicTimeoutsRef.current = [];
-  };
-
-  const playTone = (frequency, startAt = 0, duration = 0.18, type = 'square', volume = 0.08) => {
-    const ctx = audioContextRef.current;
-    if (!ctx) return;
-
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.type = type;
-    oscillator.frequency.value = frequency;
-
-    const now = ctx.currentTime + startAt;
-    gainNode.gain.setValueAtTime(volume, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    oscillator.start(now);
-    oscillator.stop(now + duration);
   };
 
   const playBeep = () => {
     initAudio();
     if (!audioContextRef.current) return;
-    playTone(880, 0, 0.25, 'sine', 0.15);
+
+    try {
+      const ctx = audioContextRef.current;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.frequency.value = 880;
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.4);
+    } catch (error) {
+      console.error('Error al reproducir sonido:', error);
+    }
   };
 
   const playCompletionSound = () => {
     initAudio();
     if (!audioContextRef.current) return;
 
-    const notes = [
-      { freq: 523, time: 0, duration: 0.15 },
-      { freq: 659, time: 0.15, duration: 0.15 },
-      { freq: 784, time: 0.3, duration: 0.15 },
-      { freq: 1047, time: 0.45, duration: 0.45 },
-    ];
+    try {
+      const ctx = audioContextRef.current;
+      const notes = [
+        { freq: 523, time: 0, duration: 0.15 },
+        { freq: 659, time: 0.15, duration: 0.15 },
+        { freq: 784, time: 0.3, duration: 0.15 },
+        { freq: 1047, time: 0.45, duration: 0.4 },
+      ];
 
-    notes.forEach((note) => {
-      playTone(note.freq, note.time, note.duration, 'square', 0.12);
-    });
+      notes.forEach((note) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        oscillator.frequency.value = note.freq;
+        oscillator.type = 'square';
+
+        const startTime = ctx.currentTime + note.time;
+        gainNode.gain.setValueAtTime(0.3, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + note.duration);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + note.duration);
+      });
+    } catch (error) {
+      console.error('Error al reproducir sonido:', error);
+    }
   };
 
   const playBackgroundMusic = () => {
-    if (isMusicMuted || !isRunning || phase === PHASES.completed) return;
+    if (isMusicMuted) return;
+
     initAudio();
     if (!audioContextRef.current) return;
 
-    clearScheduledMusic();
+    try {
+      const ctx = audioContextRef.current;
+      const melody = [
+        523, 659, 784, 1047, 784, 659,
+        523, 659, 784, 1047, 784, 659,
+        587, 740, 880, 1175, 880, 740,
+        523, 659, 784, 1047, 784, 659,
+      ];
 
-    const melody = [
-      523, 659, 784, 1047, 784, 659,
-      523, 659, 784, 1047, 784, 659,
-      587, 740, 880, 1175, 880, 740,
-      523, 659, 784, 1047, 784, 659,
-    ];
+      const noteDuration = 0.18;
 
-    const noteDuration = 0.18;
-    const loopDurationMs = melody.length * noteDuration * 1000;
+      melody.forEach((freq, index) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
 
-    melody.forEach((freq, index) => {
-      playTone(freq, index * noteDuration, 0.14, 'square', 0.035);
-    });
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
 
-    const timeoutId = window.setTimeout(() => {
-      if (isRunning && !isMusicMuted && phase !== PHASES.completed) {
-        playBackgroundMusic();
-      }
-    }, loopDurationMs);
+        oscillator.frequency.value = freq;
+        oscillator.type = 'square';
 
-    musicTimeoutsRef.current.push(timeoutId);
-  };
+        const startTime = ctx.currentTime + index * noteDuration;
+        gainNode.gain.setValueAtTime(0.06, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration - 0.01);
 
-  const spawnConfetti = () => {
-    const pieces = Array.from({ length: 120 }, (_, index) => ({
-      id: `${Date.now()}-${index}`,
-      left: Math.random() * 100,
-      delay: Math.random() * 0.8,
-      duration: 2 + Math.random() * 2,
-      rotation: Math.random() * 360,
-      color: ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'][index % 6],
-      size: 6 + Math.random() * 10,
-    }));
-
-    setConfetti(pieces);
-    window.setTimeout(() => setConfetti([]), 4200);
-  };
-
-  const advancePhase = () => {
-    playBeep();
-
-    if (phase === PHASES.preparation) {
-      setPhase(PHASES.work);
-      setTimeLeft(WORK_SECONDS);
-      return;
-    }
-
-    if (phase === PHASES.work && currentIteration < TOTAL_ITERATIONS) {
-      setPhase(PHASES.break);
-      setTimeLeft(BREAK_SECONDS);
-      return;
-    }
-
-    if (phase === PHASES.break) {
-      const nextIteration = currentIteration + 1;
-      setCurrentIteration(nextIteration);
-      if (nextIteration === TOTAL_ITERATIONS) {
-        setPhase(PHASES.finalWork);
-        setTimeLeft(WORK_SECONDS);
-      } else {
-        setPhase(PHASES.work);
-        setTimeLeft(WORK_SECONDS);
-      }
-      return;
-    }
-
-    if (phase === PHASES.work && currentIteration === TOTAL_ITERATIONS) {
-      setPhase(PHASES.completed);
-      setTimeLeft(0);
-      setIsRunning(false);
-      playCompletionSound();
-      spawnConfetti();
-      clearScheduledMusic();
-      return;
-    }
-
-    if (phase === PHASES.finalWork) {
-      setPhase(PHASES.completed);
-      setTimeLeft(0);
-      setIsRunning(false);
-      playCompletionSound();
-      spawnConfetti();
-      clearScheduledMusic();
-    }
-  };
-
-  useEffect(() => {
-    if (!isRunning || phase === PHASES.completed) return undefined;
-
-    const interval = window.setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(interval);
-          advancePhase();
-          return 0;
-        }
-        return prev - 1;
+        oscillator.start(startTime);
+        oscillator.stop(startTime + noteDuration);
       });
-    }, 1000);
-
-    return () => window.clearInterval(interval);
-  }, [isRunning, phase, currentIteration]);
-
-  useEffect(() => {
-    if (isRunning && !isMusicMuted && audioUnlocked && phase !== PHASES.completed) {
-      playBackgroundMusic();
-    } else {
-      clearScheduledMusic();
+    } catch (error) {
+      console.error('Error al reproducir música:', error);
     }
-
-    return () => clearScheduledMusic();
-  }, [isRunning, isMusicMuted, phase, audioUnlocked]);
-
-  useEffect(() => () => clearScheduledMusic(), []);
-
-  const toggleRunning = () => {
-    initAudio();
-    if (phase === PHASES.completed) return;
-    setIsRunning((prev) => !prev);
   };
 
-  const resetTimer = () => {
-    clearScheduledMusic();
+  const createConfetti = () => {
+    const newConfetti = [];
+    for (let i = 0; i < 100; i += 1) {
+      newConfetti.push({
+        id: i,
+        left: Math.random() * 100,
+        animationDuration: 2 + Math.random() * 3,
+        delay: Math.random() * 0.5,
+        color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'][Math.floor(Math.random() * 6)],
+      });
+    }
+    setConfetti(newConfetti);
+  };
+
+  useEffect(() => {
+    let interval = null;
+
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (isRunning && timeLeft === 0) {
+      if (phase === 'preparation') {
+        playBeep();
+        setPhase('work');
+        setCurrentIteration(1);
+        setTimeLeft(8);
+      } else if (phase === 'work' && currentIteration < 18) {
+        playBeep();
+        setCurrentIteration((prev) => prev + 1);
+        setTimeLeft(8);
+      } else if (phase === 'work' && currentIteration === 18) {
+        playBeep();
+        setPhase('break');
+        setCurrentIteration(1);
+        setTimeLeft(40);
+      } else if (phase === 'break') {
+        playBeep();
+        setPhase('finalWork');
+        setCurrentIteration(1);
+        setTimeLeft(8);
+      } else if (phase === 'finalWork' && currentIteration < 3) {
+        playBeep();
+        setCurrentIteration((prev) => prev + 1);
+        setTimeLeft(8);
+      } else if (phase === 'finalWork' && currentIteration === 3) {
+        playCompletionSound();
+        setPhase('completed');
+        setIsRunning(false);
+        createConfetti();
+      }
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, timeLeft, phase, currentIteration]);
+
+  useEffect(() => {
+    let musicInterval = null;
+
+    if (isRunning && phase !== 'completed') {
+      playBackgroundMusic();
+      musicInterval = setInterval(() => {
+        playBackgroundMusic();
+      }, 4300);
+    }
+
+    return () => {
+      if (musicInterval) clearInterval(musicInterval);
+    };
+  }, [isRunning, phase, isMusicMuted]);
+
+  const handleStartPause = () => {
+    initAudio();
+    setIsRunning(!isRunning);
+  };
+
+  const handleReset = () => {
     setIsRunning(false);
-    setTimeLeft(PREPARATION_SECONDS);
+    setTimeLeft(40);
     setCurrentIteration(1);
-    setPhase(PHASES.preparation);
+    setPhase('preparation');
     setConfetti([]);
   };
 
-  const toggleMusic = () => {
-    initAudio();
-    setIsMusicMuted((prev) => !prev);
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <div className="app-shell">
-      <div className="bg-grid" />
-      {confetti.map((piece) => (
-        <span
-          key={piece.id}
-          className="confetti-piece"
-          style={{
-            left: `${piece.left}%`,
-            animationDelay: `${piece.delay}s`,
-            animationDuration: `${piece.duration}s`,
-            backgroundColor: piece.color,
-            width: `${piece.size}px`,
-            height: `${piece.size * 0.55}px`,
-            transform: `rotate(${piece.rotation}deg)`,
-          }}
-        />
-      ))}
+  const getPhaseText = () => {
+    if (phase === 'preparation') return 'Preparación';
+    if (phase === 'work') return 'Fase Cepillado';
+    if (phase === 'break') return 'Descanso';
+    if (phase === 'finalWork') return 'Trabajo - Fase Final';
+    return '¡Sesión Completada!';
+  };
 
-      <main className="app-card">
-        <div className="header-row">
-          <div>
-            <p className="eyebrow">Mario Focus Timer</p>
-            <h1>Web app de enfoque con energía de estrella</h1>
-            <p className="lead">
-              Preparación de 40s, bloques de trabajo de 40s, breaks de 20s y cierre con sonido victorioso.
-            </p>
+  const getTotalIterations = () => {
+    if (phase === 'preparation') return 1;
+    if (phase === 'work') return 18;
+    if (phase === 'break') return 1;
+    if (phase === 'finalWork') return 3;
+    return 1;
+  };
+
+  const getProgress = () => {
+    if (phase === 'completed') return 100;
+    const total = getTotalIterations();
+    return (currentIteration / total) * 100;
+  };
+
+  if (phase === 'completed') {
+    return (
+      <div className="screen complete-screen">
+        {confetti.map((conf) => (
+          <div
+            key={conf.id}
+            className="confetti-dot"
+            style={{
+              left: `${conf.left}%`,
+              top: '-10px',
+              backgroundColor: conf.color,
+              animationDuration: `${conf.animationDuration}s`,
+              animationDelay: `${conf.delay}s`,
+            }}
+          />
+        ))}
+
+        <div className="card success-card">
+          <div className="sparkle-wrap">
+            <Sparkles className="sparkle-icon" />
           </div>
-          <button className="icon-button ghost" onClick={toggleMusic} aria-label="Alternar música">
-            {isMusicMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+
+          <h1>¡Felicidades! 🎉</h1>
+          <p>Has completado la sesión de cepillado</p>
+
+          <button onClick={handleReset} className="btn btn-success">
+            <RotateCcw size={20} />
+            Nueva Sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen app-screen">
+      <div className="card app-card-simple">
+        <h1>Temporizador Automático</h1>
+
+        <div className="top-actions">
+          <button
+            onClick={() => setIsMusicMuted(!isMusicMuted)}
+            className="icon-toggle"
+            title={isMusicMuted ? 'Activar música de fondo' : 'Silenciar música de fondo'}
+          >
+            {isMusicMuted ? (
+              <VolumeX size={24} className="mute-icon" />
+            ) : (
+              <Volume2 size={24} className="sound-icon" />
+            )}
           </button>
         </div>
 
-        <section className="timer-panel">
-          <div className="phase-badge" style={{ borderColor: currentConfig.color, color: currentConfig.color }}>
-            <Sparkles size={16} />
-            <span>{currentConfig.label}</span>
+        <div className="phase-section">
+          <div className="phase-title">{getPhaseText()}</div>
+          <div className="phase-meta">
+            {phase === 'preparation' || phase === 'break'
+              ? 'Fase única'
+              : `Iteración ${currentIteration} de ${getTotalIterations()}`}
           </div>
 
-          <div className="timer-ring" style={{ '--progress': `${progress}%`, '--phase-color': currentConfig.color }}>
-            <div className="timer-core">
-              <span className="time-label">{formatTime(timeLeft)}</span>
-              <span className="phase-subtitle">{currentConfig.subtitle}</span>
-            </div>
+          <div className="progress-bar-bg">
+            <div className="progress-bar-fill" style={{ width: `${getProgress()}%` }} />
           </div>
+        </div>
 
-          <div className="status-row">
-            <div className="status-card">
-              <span className="status-title">Iteración</span>
-              <strong>{currentIteration} / {TOTAL_ITERATIONS}</strong>
-            </div>
-            <div className="status-card">
-              <span className="status-title">Estado</span>
-              <strong>{phase === PHASES.completed ? 'Terminado' : isRunning ? 'Corriendo' : 'Pausado'}</strong>
-            </div>
-          </div>
+        <div className="timer-section">
+          <div className="timer-text">{formatTime(timeLeft)}</div>
+          <div className="timer-subtext">segundos</div>
+        </div>
 
-          <div className="controls-row">
-            <button className="action-button primary" onClick={toggleRunning} disabled={phase === PHASES.completed}>
-              {isRunning ? <Pause size={18} /> : <Play size={18} />}
-              {isRunning ? 'Pausar' : 'Iniciar'}
-            </button>
-            <button className="action-button secondary" onClick={resetTimer}>
-              <RotateCcw size={18} />
-              Reset
-            </button>
-          </div>
-        </section>
+        <div className="button-row">
+          <button onClick={handleStartPause} className="btn btn-primary">
+            {isRunning ? (
+              <>
+                <Pause size={20} />
+                Pausar
+              </>
+            ) : (
+              <>
+                <Play size={20} />
+                Iniciar
+              </>
+            )}
+          </button>
 
-        <section className="info-grid">
-          <article className="info-card">
-            <h2>Flujo</h2>
-            <ul>
-              <li>40s de preparación</li>
-              <li>3 rondas de trabajo</li>
-              <li>20s de descanso entre rondas</li>
-              <li>Sonido final + confetti</li>
-            </ul>
-          </article>
+          <button onClick={handleReset} className="btn btn-secondary">
+            <RotateCcw size={20} />
+            Reiniciar
+          </button>
+        </div>
 
-          <article className="info-card">
-            <h2>Audio</h2>
-            <ul>
-              <li>Beep fuerte en cada transición</li>
-              <li>Jingle victorioso al final</li>
-              <li>Música retro de fondo muteable</li>
-              <li>Web Audio API, sin assets externos</li>
-            </ul>
-          </article>
-        </section>
-      </main>
+        <div className="sequence-box">
+          <h3>Secuencia:</h3>
+          <ol>
+            <li>Preparación de 40 segundos</li>
+            <li>18 intervalos de 8 segundos (cepillado)</li>
+            <li>1 descanso de 40 segundos</li>
+            <li>3 intervalos de 8 segundos</li>
+            <li>¡Celebración al completar!</li>
+          </ol>
+        </div>
+      </div>
     </div>
   );
 };
